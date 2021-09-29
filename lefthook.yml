@@ -1,0 +1,41 @@
+---
+pre-push:
+  piped: true
+  commands:
+    1_build:
+      run: |
+        DOCKER_BUILDKIT=1 docker build -t \
+        troyfontaine/swiss_linter:pre-push .
+    2_test-yaml:
+      files: git diff --name-only @{push}
+      glob: "*.{yml,yaml}"
+      run: |
+        docker run --rm --name swiss_linter \
+        -v "${PWD}:/tmp/lint" \
+        troyfontaine/swiss_linter:pre-push yamllint {files}
+    3_test-json:
+      files: git diff --name-only @{push}
+      glob: "*.json"
+      run: |
+        docker run --rm --name swiss_linter \
+        -v "${PWD}:/tmp/lint" \
+        troyfontaine/swiss_linter:pre-push json {files}
+    4_clean-up:
+      run: |
+        docker image rm \
+        troyfontaine/swiss_linter:pre-push
+
+pre-commit:
+  parallel: true
+  commands:
+    dockerfile-lint:
+      glob: "Dockerfile"
+      run: |
+        docker run --rm -i \
+        hadolint/hadolint < {staged_files}
+    shell-check:
+      glob: "*.sh"
+      run: |
+        docker run --rm -it -v \
+        "${PWD}:/mnt" koalaman/shellcheck:stable \
+        {staged_files}
